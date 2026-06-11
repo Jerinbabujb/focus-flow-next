@@ -6,6 +6,7 @@ import { DashboardView } from "@/src/components/dashboard-view"
 import { TasksView } from "@/src/components/task-view"
 import { GroceryView } from "@/src/components/grocery-view"
 import { DebtView } from "@/src/components/debt-view"
+import { BillArchiveView } from "@/src/components/bill-archive-view"
 
 export default function Page() {
   const [active, setActive] = useState("Tasks")
@@ -21,6 +22,8 @@ export default function Page() {
             <GroceryView />
           ) : active === "Debts" ? (
             <DebtView />
+          ) : active === "Bill Archive" ? (
+            <BillArchiveView />
           ) : (
             <DashboardView />
           )}
