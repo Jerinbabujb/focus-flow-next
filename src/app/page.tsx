@@ -9,7 +9,7 @@ import { DebtView } from "@/src/components/debt-view"
 import { BillArchiveView } from "@/src/components/bill-archive-view"
 
 export default function Page() {
-  const [active, setActive] = useState("Tasks")
+  const [active, setActive] = useState("Overview")
 
   return (
     <main className="app-backdrop min-h-screen">
