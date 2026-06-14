@@ -11,7 +11,7 @@ import { BillArchiveView } from "@/src/components/bill-archive-view"
 export default function Page() {
   const [active, setActive] = useState("Overview")
 
-  return (
+   return (
     <main className="app-backdrop min-h-screen">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:flex-row">
         <Sidebar active={active} onNavigate={setActive} />
@@ -25,7 +25,7 @@ export default function Page() {
           ) : active === "Bill Archive" ? (
             <BillArchiveView />
           ) : (
-            <DashboardView />
+            <DashboardView onNavigate={setActive} />
           )}
         </div>
       </div>

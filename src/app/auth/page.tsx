@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { Sparkles, Mail, Lock, User, Eye, EyeOff, Check, X } from "lucide-react"
+import { useRouter } from "next/navigation";
 import { cn } from "@/src/lib/utils"
 
 type Mode = "login" | "signup"
@@ -18,6 +19,7 @@ export default function AuthPage() {
     confirmPassword: "",
   })
   const [submitted, setSubmitted] = useState<string | null>(null)
+  const router= useRouter();
 
   const isSignup = mode === "signup"
   const passwordsMatch =
@@ -35,7 +37,7 @@ export default function AuthPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Mockup only — no backend call.
+    router.push("/");
     setSubmitted(
       isSignup
         ? `Account created for ${form.username || "your account"} (demo only)`

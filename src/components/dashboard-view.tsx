@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import {
   Wallet,
   CreditCard,
@@ -7,6 +10,11 @@ import {
   ListChecks,
   Receipt,
   CalendarClock,
+  CheckSquare,
+  ShoppingCart,
+  HandCoins,
+  Archive,
+  X,
 } from "lucide-react"
 import { KpiCard } from "@/src/components/kpi-card"
 
@@ -49,7 +57,20 @@ const placeholders = [
   { title: "Schedule", icon: CalendarClock, span: "lg:col-span-2" },
 ]
 
-export function DashboardView() {
+const entryOptions = [
+  { name: "Task", view: "Tasks", icon: CheckSquare, desc: "Add a to-do or reminder" },
+  { name: "Grocery", view: "Groceries", icon: ShoppingCart, desc: "Add an item to your list" },
+  { name: "Debt", view: "Debts", icon: HandCoins, desc: "Track money owed or lent" },
+  { name: "Bill", view: "Bill Archive", icon: Archive, desc: "Save a bill or receipt" },
+]
+
+interface DashboardViewProps {
+  onNavigate?: (name: string) => void
+}
+
+export function DashboardView({ onNavigate }: DashboardViewProps) {
+  const [showEntryModal, setShowEntryModal] = useState(false)
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -62,6 +83,7 @@ export function DashboardView() {
         </div>
         <button
           type="button"
+          onClick={() => setShowEntryModal(true)}
           className="w-fit rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
         >
           New Entry
@@ -106,6 +128,66 @@ export function DashboardView() {
           })}
         </div>
       </section>
+
+      {/* New Entry modal */}
+      {showEntryModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-entry-title"
+        >
+          <button
+            type="button"
+            aria-label="Close dialog"
+            onClick={() => setShowEntryModal(false)}
+            className="absolute inset-0 bg-background/60 backdrop-blur-sm"
+          />
+          <div className="glass relative z-10 w-full max-w-md rounded-3xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="new-entry-title" className="text-lg font-semibold tracking-tight">
+                  New Entry
+                </h2>
+                <p className="text-sm text-muted-foreground">What would you like to add?</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEntryModal(false)}
+                aria-label="Close"
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {entryOptions.map((option) => {
+                const Icon = option.icon
+                return (
+                  <button
+                    key={option.name}
+                    type="button"
+                    onClick={() => {
+                      onNavigate?.(option.view)
+                      setShowEntryModal(false)
+                    }}
+                    className="glass flex flex-col items-start gap-3 rounded-2xl p-4 text-left transition-colors hover:bg-secondary"
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <span className="flex flex-col">
+                      <span className="text-sm font-semibold">{option.name}</span>
+                      <span className="text-xs text-muted-foreground">{option.desc}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
