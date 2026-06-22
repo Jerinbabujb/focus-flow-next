@@ -5,13 +5,15 @@ import { useState } from "react"
 import { Sparkles, Mail, Lock, User, Eye, EyeOff, Check, X } from "lucide-react"
 import { useRouter } from "next/navigation";
 import { cn } from "@/src/lib/utils"
-
+import { authenticate } from "@/src/actions/auth";
+import { useTransition } from "react";
 type Mode = "login" | "signup"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<Mode>("login")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -36,14 +38,21 @@ export default function AuthPage() {
   }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    router.push("/");
-    setSubmitted(
-      isSignup
-        ? `Account created for ${form.username || "your account"} (demo only)`
-        : "Signed in (demo only)",
-    )
-  }
+  e.preventDefault();
+  
+  startTransition(async () => {
+    const formData = new FormData();
+    formData.append("email", form.email);
+    formData.append("password", form.password);
+    if (isSignup) formData.append("username", form.username);
+
+    const result = await authenticate(formData, isSignup);
+    
+    if (result?.error) {
+      setSubmitted(result.error); // Show error in your UI
+    }
+  });
+};
 
   return (
     <main className="app-backdrop flex min-h-screen items-center justify-center p-4">

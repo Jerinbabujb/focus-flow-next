@@ -4,10 +4,130 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js" // ✅ Fixed provider name
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum DebtType {
+  OWED_TO_ME
+  I_OWE_OTHERS
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  password      String
+  createdAt     DateTime       @default(now())
+  tasks         Task[]
+  expenses      Expense[]
+  debts         Debt[]
+  billArchives  BillArchive[]
+  groupMembers  GroupMember[]
+}
+
+model Group {
+  id            String         @id @default(uuid())
+  name          String
+  createdAt     DateTime       @default(now())
+  members       GroupMember[]
+  groceryLists  GroceryList[]
+  debts         Debt[]
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  userId    String
+  groupId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Task {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  priority       Priority  @default(MEDIUM)
+  isCompleted    Boolean   @default(false)
+  completedAt    DateTime?
+  isRecurring    Boolean   @default(false)
+  repeatCount    Int       @default(0)
+  currentStreak  Int       @default(0)
+  nextDueDate    DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+}
+
+model GroceryList {
+  id          String        @id @default(uuid())
+  groupId     String?
+  group       Group?        @relation(fields: [groupId], references: [id])
+  title       String
+  totalCost   Float         @default(0.0)
+  createdAt   DateTime      @default(now())
+  items       GroceryItem[]
+  expenseId   String?       @unique
+  expense     Expense?      @relation(fields: [expenseId], references: [id])
+}
+
+model GroceryItem {
+  id            String      @id @default(uuid())
+  groceryListId String
+  groceryList   GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  name          String
+  quantity      Int         @default(1)
+  price         Float       @default(0.0)
+  isBought      Boolean     @default(false)
+}
+
+model Debt {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId     String?
+  group       Group?    @relation(fields: [groupId], references: [id])
+  type        DebtType
+  personName  String
+  amount      Float
+  description String?
+  isSettled   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  expenseId   String?   @unique
+  expense     Expense?  @relation(fields: [expenseId], references: [id])
+}
+
+model BillArchive {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  s3Url       String
+  vendorName  String?
+  amount      Float    @default(0.0)
+  createdAt   DateTime @default(now())
+  expenseId   String?  @unique
+  expense     Expense? @relation(fields: [expenseId], references: [id])
+}
+
+model Expense {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Float
+  category      String
+  description   String
+  date          DateTime     @default(now())
+  groceryList   GroceryList?
+  debt          Debt?
+  billArchive   BillArchive?
 }
