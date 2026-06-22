@@ -55,18 +55,19 @@ model GroupMember {
 }
 
 model Task {
-  id             String    @id @default(uuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title          String
-  priority       Priority  @default(MEDIUM)
-  isCompleted    Boolean   @default(false)
-  completedAt    DateTime?
-  isRecurring    Boolean   @default(false)
-  repeatCount    Int       @default(0)
-  currentStreak  Int       @default(0)
-  nextDueDate    DateTime  @default(now())
-  createdAt      DateTime  @default(now())
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  priority      Priority  @default(MEDIUM)
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  isRecurring   Boolean   @default(false)
+  repeatInterval String?  // <-- ADD THIS: "daily", "weekly", or "monthly"
+  repeatCount   Int       @default(0)
+  currentStreak Int       @default(0)
+  nextDueDate   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 }
 
 model GroceryList {
