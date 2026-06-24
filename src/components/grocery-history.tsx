@@ -1,8 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { History, CalendarDays, ShoppingBasket, Check, ArrowLeft, Trash2 } from "lucide-react"
+import { History, CalendarDays, ShoppingBasket, Check, ArrowLeft, Trash2, Undo2, Users } from "lucide-react"
 import { cn } from "@/src/lib/utils"
+
+// Import Server Actions for restore and delete
+import { toggleGroceryBought, deleteGroceryItem } from "@/src/actions/groceries"
 
 type Priority = "p1" | "p2" | "p3"
 
@@ -15,6 +18,7 @@ export interface HistoryItem {
   amount: number | null
   buyDate: string
   boughtAt: string
+  groupName?: string | null // Distinguishes between personal and group items
 }
 
 const formatMoney = (n: number) =>
@@ -42,12 +46,25 @@ interface GroceryHistoryProps {
   onClear: () => void
 }
 
-export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps) {
+export function GroceryHistory({ history: initialHistory, onBack, onClear }: GroceryHistoryProps) {
+  // Wrap history in local state for optimistic UI updates
+  const [history, setHistory] = useState<HistoryItem[]>(initialHistory)
   const [mode, setMode] = useState<"day" | "month">("month")
   const [selectedDay, setSelectedDay] = useState("")
   const [selectedMonth, setSelectedMonth] = useState("")
 
-  // Available months for the month filter dropdown
+  // --- Handlers for Restore & Delete ---
+  const handleRestore = (id: string) => {
+    setHistory((prev) => prev.filter((t) => t.id !== id))
+    toggleGroceryBought(id, false).catch(console.error)
+  }
+
+  const handleDelete = (id: string) => {
+    setHistory((prev) => prev.filter((t) => t.id !== id))
+    deleteGroceryItem(id).catch(console.error)
+  }
+
+  // Available months for the filter dropdown
   const months = useMemo(() => {
     const set = new Set(history.map((h) => monthKey(h.boughtAt)))
     return Array.from(set).sort().reverse()
@@ -63,7 +80,7 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
     return history
   }, [history, mode, selectedDay, selectedMonth])
 
-  // group filtered results by month for display
+  // Group filtered results by month
   const grouped = useMemo(() => {
     const map = new Map<string, HistoryItem[]>()
     for (const item of filtered) {
@@ -102,7 +119,10 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
           {history.length > 0 && (
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => {
+                setHistory([]);
+                onClear();
+              }}
               className="flex w-fit items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
             >
               <Trash2 className="size-4" aria-hidden="true" />
@@ -121,9 +141,7 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
               onClick={() => setMode("month")}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                mode === "month"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                mode === "month" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               By month
@@ -133,9 +151,7 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
               onClick={() => setMode("day")}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                mode === "day"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                mode === "day" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               By date
@@ -147,13 +163,10 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-ring"
-              aria-label="Filter by month"
             >
               <option value="">All months</option>
               {months.map((m) => (
-                <option key={m} value={m}>
-                  {monthLabel(m)}
-                </option>
+                <option key={m} value={m}>{monthLabel(m)}</option>
               ))}
             </select>
           ) : (
@@ -164,7 +177,6 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
                 value={selectedDay}
                 onChange={(e) => setSelectedDay(e.target.value)}
                 className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-ring"
-                aria-label="Filter by date"
               />
             </label>
           )}
@@ -211,7 +223,7 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
 
         {filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            {history.length === 0
+            {initialHistory.length === 0
               ? "Nothing here yet. Items you mark as bought will show up in history."
               : "No purchases match this filter."}
           </p>
@@ -232,11 +244,11 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
                     key={`${item.id}-${idx}`}
                     className="flex items-center gap-3 rounded-2xl bg-secondary/40 p-3"
                   >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/20 text-primary">
                       <Check className="size-4" aria-hidden="true" />
                     </span>
                     <div className="flex flex-1 flex-col gap-1">
-                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-medium text-muted-foreground line-through">{item.name}</span>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span>{item.category}</span>
                         <span className="flex items-center gap-1">
@@ -250,6 +262,37 @@ export function GroceryHistory({ history, onBack, onClear }: GroceryHistoryProps
                         </span>
                       </div>
                     </div>
+                    
+                    {/* Visual Group Badge if applicable */}
+                    {item.groupName && (
+                      <span className="flex items-center gap-1 rounded-md bg-chart-4/15 px-2 py-1 text-[10px] font-bold uppercase text-chart-4">
+                        <Users className="size-3" />
+                        {item.groupName}
+                      </span>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRestore(item.id)}
+                        className="flex items-center justify-center rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        aria-label="Restore item"
+                        title="Restore item"
+                      >
+                        <Undo2 className="size-4" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="flex items-center justify-center rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
+                        aria-label="Delete item permanently"
+                        title="Delete item permanently"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    </div>
+
                   </li>
                 ))}
               </ul>

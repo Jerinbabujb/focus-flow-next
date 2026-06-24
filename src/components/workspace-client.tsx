@@ -4,17 +4,37 @@ import { useState } from "react"
 import { Sidebar } from "@/src/components/sidebard"
 import { DashboardView } from "@/src/components/dashboard-view"
 import { TasksView, type Task } from "@/src/components/task-view"
-import { type TaskHistoryItem } from "@/src/components/task-history" // Make sure this path matches your project
-import { GroceryView } from "@/src/components/grocery-view"
-import { DebtView } from "@/src/components/debt-view"
+import { type TaskHistoryItem } from "@/src/components/task-history" 
+import { GroceryView, type GroceryItem } from "@/src/components/grocery-view" 
+import { type HistoryItem as GroceryHistoryItem } from "@/src/components/grocery-history" 
+import { type ShoppingGroup } from "@/src/components/grocery-groups" // <-- Import the type
 import { BillArchiveView } from "@/src/components/bill-archive-view"
+import { DebtView, type DebtItem } from "@/src/components/debt-view"
+import { type DebtHistoryItem } from "@/src/components/debt-history"
 
 interface WorkspaceClientProps {
   initialTasks: Task[];
-  initialHistory: TaskHistoryItem[]; // <-- Add this to the interface
+  initialHistory: TaskHistoryItem[];
+  initialGroceries: GroceryItem[]; 
+  initialGroceryHistory: GroceryHistoryItem[]; 
+  initialGroups: ShoppingGroup[]; // <-- Add to interface
+  initialDebts?: DebtItem[]
+  initialGroceryGroups: ShoppingGroup[]; 
+  initialDebtGroups: ShoppingGroup[];
+  initialDebtHistory?: DebtHistoryItem[]
 }
 
-export default function WorkspaceClient({ initialTasks, initialHistory }: WorkspaceClientProps) {
+export default function WorkspaceClient({ 
+  initialTasks, 
+  initialHistory,
+  initialGroceries,
+  initialGroceryHistory,
+  initialGroups, // <-- Catch the prop
+  initialDebts = [],
+  initialDebtHistory = [],
+  initialGroceryGroups,
+  initialDebtGroups,
+}: WorkspaceClientProps) {
   const [active, setActive] = useState("Overview")
 
   return (
@@ -23,12 +43,19 @@ export default function WorkspaceClient({ initialTasks, initialHistory }: Worksp
         <Sidebar active={active} onNavigate={setActive} />
         <div className="flex-1 py-2 md:py-0">
           {active === "Tasks" ? (
-            // Pass the history prop into TasksView
             <TasksView initialTasks={initialTasks} initialHistory={initialHistory} />
           ) : active === "Groceries" ? (
-            <GroceryView />
+            // Pass all three props down to the Grocery view
+            <GroceryView 
+              initialItems={initialGroceries} 
+              initialHistory={initialGroceryHistory} 
+              initialGroups={initialGroceryGroups}// <-- Pass to view
+            />
           ) : active === "Debts" ? (
-            <DebtView />
+            <DebtView  initialItems={initialDebts} 
+              initialHistory={initialDebtHistory}
+             initialGroups={initialDebtGroups as any}
+              />
           ) : active === "Bill Archive" ? (
             <BillArchiveView />
           ) : (

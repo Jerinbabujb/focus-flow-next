@@ -1,8 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { History, CalendarDays, Check, ArrowLeft, Trash2, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+import { History, CalendarDays, Check, ArrowLeft, Trash2, ArrowUpRight, ArrowDownLeft, Undo2 } from "lucide-react"
 import { cn } from "@/src/lib/utils"
+
+// Import Server Actions
+import { toggleDebtSettled, deleteDebt } from "@/src/actions/debts"
 
 export type DebtCategory = "to-give" | "given"
 
@@ -46,10 +49,27 @@ interface DebtHistoryProps {
   onClear: () => void
 }
 
-export function DebtHistory({ history, onBack, onClear }: DebtHistoryProps) {
+export function DebtHistory({ history: initialHistory, onBack, onClear }: DebtHistoryProps) {
+  // Wrap history in local state for optimistic UI updates
+  const [history, setHistory] = useState<DebtHistoryItem[]>(initialHistory)
   const [mode, setMode] = useState<"day" | "month">("month")
   const [selectedDay, setSelectedDay] = useState("")
   const [selectedMonth, setSelectedMonth] = useState("")
+
+  // --- Handlers for Restore & Delete ---
+  const handleRestore = (id: string) => {
+    // 1. Optimistic UI
+    setHistory((prev) => prev.filter((t) => t.id !== id))
+    // 2. DB Sync
+    toggleDebtSettled(id, false).catch(console.error)
+  }
+
+  const handleDelete = (id: string) => {
+    // 1. Optimistic UI
+    setHistory((prev) => prev.filter((t) => t.id !== id))
+    // 2. DB Sync
+    deleteDebt(id).catch(console.error)
+  }
 
   const months = useMemo(() => {
     const set = new Set(history.map((h) => monthKey(h.settledAt)))
@@ -104,7 +124,10 @@ export function DebtHistory({ history, onBack, onClear }: DebtHistoryProps) {
           {history.length > 0 && (
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => {
+                setHistory([])
+                onClear()
+              }}
               className="flex w-fit items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
             >
               <Trash2 className="size-4" aria-hidden="true" />
@@ -217,7 +240,7 @@ export function DebtHistory({ history, onBack, onClear }: DebtHistoryProps) {
 
         {filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            {history.length === 0
+            {initialHistory.length === 0
               ? "Nothing here yet. Entries you settle will show up in history."
               : "No entries match this filter."}
           </p>
@@ -242,11 +265,11 @@ export function DebtHistory({ history, onBack, onClear }: DebtHistoryProps) {
                       key={`${item.id}-${idx}`}
                       className="flex items-center gap-3 rounded-2xl bg-secondary/40 p-3"
                     >
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/20 text-primary">
                         <Check className="size-4" aria-hidden="true" />
                       </span>
                       <div className="flex flex-1 flex-col gap-1">
-                        <span className="text-sm font-medium">{item.person}</span>
+                        <span className="text-sm font-medium text-muted-foreground line-through">{item.person}</span>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           {item.note && <span>{item.note}</span>}
                           <span className="flex items-center gap-1">
@@ -264,7 +287,29 @@ export function DebtHistory({ history, onBack, onClear }: DebtHistoryProps) {
                         <Icon className="size-3.5" aria-hidden="true" />
                         {categoryMeta[item.category].label}
                       </span>
-                      <span className="text-sm font-semibold">{formatMoney(item.amount)}</span>
+                      <span className="text-sm font-semibold text-muted-foreground line-through">{formatMoney(item.amount)}</span>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 ml-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRestore(item.id)}
+                          className="flex items-center justify-center rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          aria-label="Restore entry"
+                          title="Restore entry"
+                        >
+                          <Undo2 className="size-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id)}
+                          className="flex items-center justify-center rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
+                          aria-label="Delete permanently"
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </li>
                   )
                 })}

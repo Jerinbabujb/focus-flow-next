@@ -22,6 +22,18 @@ enum DebtType {
   I_OWE_OTHERS
 }
 
+enum GroceryCategory {
+  PRODUCE
+  DAIRY
+  BAKERY
+  MEAT
+  PANTRY
+  FROZEN
+  HOUSEHOLD
+  OTHER
+}
+
+
 model User {
   id            String         @id @default(uuid())
   email         String         @unique
@@ -29,6 +41,7 @@ model User {
   password      String
   createdAt     DateTime       @default(now())
   tasks         Task[]
+  groceryItems  GroceryItem[]
   expenses      Expense[]
   debts         Debt[]
   billArchives  BillArchive[]
@@ -36,22 +49,30 @@ model User {
 }
 
 model Group {
-  id            String         @id @default(uuid())
-  name          String
-  createdAt     DateTime       @default(now())
-  members       GroupMember[]
-  groceryLists  GroceryList[]
-  debts         Debt[]
+  id           String        @id @default(uuid())
+  name         String
+  type         String        @default("GROCERY")
+  createdAt    DateTime      @default(now())
+  members      GroupMember[]
+  groceryLists GroceryList[]
+  groceryItems GroceryItem[] // <-- ADD THIS
+  debts        Debt[]
 }
 
 model GroupMember {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String?  // <-- MAKE OPTIONAL (for pending email invites)
   groupId   String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String   // <-- ADD THIS (to track who was invited)
+  name      String?  // <-- ADD THIS (display name)
+  role      String   @default("member") // "owner" or "member"
+  status    String   @default("joined") // "joined" or "invited"
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, groupId])
+  // Remove the old @@unique([userId, groupId]) since userId can be null now
+  @@unique([email, groupId]) // Prevent inviting the same email twice to a group
 }
 
 model Task {
@@ -83,13 +104,26 @@ model GroceryList {
 }
 
 model GroceryItem {
-  id            String      @id @default(uuid())
-  groceryListId String
-  groceryList   GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  id            String          @id @default(uuid())
+  userId        String          
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  groceryListId String?         
+  groceryList   GroceryList?    @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  
+  groupId       String?         // <-- ADD THIS (Links item directly to the shared group)
+  group         Group?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  addedByName   String?         // <-- ADD THIS (To display "added by Jordan" in UI)
+
   name          String
-  quantity      Int         @default(1)
-  price         Float       @default(0.0)
-  isBought      Boolean     @default(false)
+  priority      Priority        @default(MEDIUM) 
+  category      GroceryCategory @default(OTHER)
+  quantity      Int             @default(1)
+  amount        Float?          
+  buyDate       DateTime        @default(now())
+  isBought      Boolean         @default(false)
+  boughtAt      DateTime?       
+  createdAt     DateTime        @default(now())
 }
 
 model Debt {
@@ -98,11 +132,13 @@ model Debt {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupId     String?
   group       Group?    @relation(fields: [groupId], references: [id])
-  type        DebtType
+  type        DebtType  // OWED_TO_ME or I_OWE_OTHERS
   personName  String
   amount      Float
   description String?
   isSettled   Boolean   @default(false)
+  date        DateTime  @default(now()) // <-- ADDED THIS
+  settledAt   DateTime?                 // <-- ADDED THIS
   createdAt   DateTime  @default(now())
   expenseId   String?   @unique
   expense     Expense?  @relation(fields: [expenseId], references: [id])
