@@ -145,15 +145,34 @@ model Debt {
 }
 
 model BillArchive {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   s3Url       String
   vendorName  String?
-  amount      Float    @default(0.0)
-  createdAt   DateTime @default(now())
-  expenseId   String?  @unique
-  expense     Expense? @relation(fields: [expenseId], references: [id])
+  amount      Float      @default(0.0)
+  
+  receiptDate DateTime?  // <-- CHANGE 1: Catch the Textract printed date
+  createdAt   DateTime   @default(now())
+  
+  items       BillItem[] // <-- CHANGE 2: Link to the line items
+  
+  expenseId   String?    @unique
+  expense     Expense?   @relation(fields: [expenseId], references: [id])
+}
+
+// <-- CHANGE 3: Create the new model to hold the categorized line items
+model BillItem {
+  id            String          @id @default(uuid())
+  billArchiveId String
+  billArchive   BillArchive     @relation(fields: [billArchiveId], references: [id], onDelete: Cascade)
+  
+  name          String
+  amount        Float
+  category      GroceryCategory @default(OTHER)
+  quantity      Int             @default(1)
+  
+  createdAt     DateTime        @default(now())
 }
 
 model Expense {
