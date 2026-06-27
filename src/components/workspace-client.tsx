@@ -13,6 +13,7 @@ import { DebtView, type DebtItem } from "@/src/components/debt-view"
 import { type DebtHistoryItem } from "@/src/components/debt-history"
 // Import the new Expense view!
 import { ExpenseView, type Expense } from "@/src/components/expense-view"
+import { SettingsView } from "./settings-view"
 
 interface WorkspaceClientProps {
   userName?: string;
@@ -87,13 +88,25 @@ export default function WorkspaceClient({
               debtGroups={initialDebtGroups}
             />
 
+          ): active === "Settings" ? (
+            // 2. Add the Settings route here
+            <SettingsView />
+
           ) : (
             <DashboardView 
               userName={userName}
               onNavigate={setActive} 
               tasks={initialTasks} 
-              groceries={initialGroceries}
+              
+              income={initialIncome}
+              expenses={initialExpenses}
+              bills={initialBills}
+              
+              // Pass BOTH pending and completed data now!
               debts={initialDebts}
+              debtHistory={initialDebtHistory}
+              groceries={initialGroceries}
+              groceryHistory={initialGroceryHistory}
             />
           )}
           

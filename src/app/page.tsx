@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { decrypt } from "@/src/lib/session"
 import { redirect } from "next/navigation"
 import WorkspaceClient from "@/src/components/workspace-client"
+import { SettingsProvider } from "@/src/components/settings-provider"
 
 export default async function Page() {
   const cookieStore = await cookies();
@@ -74,6 +75,7 @@ export default async function Page() {
 
   // --- 10. RENDER CLIENT ---
   return (
+    <SettingsProvider>
     <WorkspaceClient 
       userName={dbUser?.name || "User"}
       initialTasks={formattedTasks} initialHistory={formattedHistory} 
@@ -82,5 +84,6 @@ export default async function Page() {
       initialDebts={formattedDebts} initialDebtHistory={formattedDebtHistory}
       initialIncome={dbUser?.monthlyIncome || 0} initialExpenses={formattedExpenses} initialBills={formattedBills}
     />
+    </SettingsProvider>
   );
 }

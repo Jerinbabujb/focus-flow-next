@@ -4,6 +4,7 @@ import prisma from "@/src/lib/prisma"; // Adjust path to your Prisma client
 import bcrypt from "bcryptjs";
 import { createSession } from "@/src/lib/session";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export async function authenticate(formData: FormData, isSignup: boolean) {
   const email = formData.get("email") as string;
@@ -42,4 +43,9 @@ export async function authenticate(formData: FormData, isSignup: boolean) {
 
   // Redirect to your Dashboard
   redirect("/");
+}
+export async function logoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete("session");
+  redirect("/auth");
 }

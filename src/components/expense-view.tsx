@@ -4,11 +4,12 @@ import { useMemo, useState } from "react"
 import {
   Wallet, TrendingDown, PiggyBank, Plus, Trash2, X, Sparkles,
   ShoppingCart, HandCoins, Archive, Pencil, Layers, BarChart3,
-  ArrowUpRight, ArrowDownRight, Check, Target, Calendar, Clock
+  ArrowUpRight, ArrowDownRight, Check, Target, Calendar, Clock, Loader2
 } from "lucide-react"
 import { cn } from "@/src/lib/utils"
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 import { updateIncomeAction, addExpenseAction, deleteExpenseAction } from "@/src/actions/expenses"
+import { generateFinancialPlan } from "@/src/actions/ai-planner"
 
 type Source = "manual" | "groceries" | "debts" | "bills" | "combined"
 
@@ -69,13 +70,14 @@ export function ExpenseView({
   const [form, setForm] = useState({ name: "", amount: "", category: "Food", source: "manual" as Source })
   const [combineName, setCombineName] = useState("")
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false)
+  const [aiTips, setAiTips] = useState<string[]>([])
   
   const [goalForm, setGoalForm] = useState({ name: "", amount: "", targetDate: "" })
   const [goals, setGoals] = useState<Goal[]>([
-    { id: "g1", name: "Relocation", amount: 2500, targetDate: "2026-07-25" },
+    { id: "g1", name: "Relocation to India", amount: 2500, targetDate: "2026-07-25" },
   ])
 
-  // Process Groups (Removed the .filter(>0) so they ALL show up)
   const mappedGroceryGroups = groceryGroups.map(g => ({
     id: g.id, name: g.name, total: g.items?.reduce((sum: number, i: any) => sum + (i.amount || 0), 0) || 0
   }))
@@ -86,25 +88,17 @@ export function ExpenseView({
   const allGroups = [...mappedGroceryGroups, ...mappedDebtGroups]
   const combinedTotal = allGroups.filter((g) => selectedGroups.includes(g.id)).reduce((sum, g) => sum + g.total, 0)
   
-  // Dynamic button label for Groups Modal
   const isSingleGroup = selectedGroups.length === 1
   const singleGroupName = isSingleGroup ? allGroups.find(g => g.id === selectedGroups[0])?.name : ""
 
-  // Aggregate EVERYTHING into one giant pipeline
   const aggregatedExpenses = useMemo<Expense[]>(() => {
     const arr: Expense[] = []
     
-    // 1. Manual DB Expenses
     expenses.forEach(e => arr.push({ ...e, status: "completed" }))
-    // 2. Uploaded Bills
     initialBills.forEach(b => arr.push({ id: b.id, name: b.vendorName, amount: b.amount, category: "Bills", source: "bills", date: b.date, status: "completed" }))
-    // 3. Completed Groceries
     completedGroceries.forEach(g => arr.push({ id: g.id, name: g.name, amount: g.amount || 0, category: "Food", source: "groceries", date: g.boughtAt, status: "completed" }))
-    // 4. Pending Groceries (Future)
     pendingGroceries.forEach(g => arr.push({ id: g.id, name: g.name, amount: g.amount || 0, category: "Food", source: "groceries", date: g.buyDate, status: "pending" }))
-    // 5. Completed Debts (Only things you owed others)
     completedDebts.filter(d => d.category === "to-give").forEach(d => arr.push({ id: d.id, name: `Paid: ${d.person}`, amount: d.amount, category: "Debt", source: "debts", date: d.settledAt, status: "completed" }))
-    // 6. Pending Debts (Future - you still owe)
     pendingDebts.filter(d => d.category === "to-give").forEach(d => arr.push({ id: d.id, name: `Owe: ${d.person}`, amount: d.amount, category: "Debt", source: "debts", date: d.date, status: "pending" }))
 
     return arr.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -113,7 +107,6 @@ export function ExpenseView({
   const completedItems = aggregatedExpenses.filter(e => e.status === "completed")
   const futureItems = aggregatedExpenses.filter(e => e.status === "pending")
 
-  // Math based on COMPLETED items
   const totalCompletedExpenses = completedItems.reduce((sum, e) => sum + e.amount, 0)
   const totalFutureExpenses = futureItems.reduce((sum, e) => sum + e.amount, 0)
   const remaining = income - totalCompletedExpenses
@@ -133,7 +126,6 @@ export function ExpenseView({
   
   const chartData = byCategory.map(([name, value]) => ({ name, value }))
 
-  // Actions
   const saveIncome = () => {
     const val = Number.parseFloat(incomeDraft)
     if (!Number.isNaN(val) && val >= 0) { setIncome(val); updateIncomeAction(val).catch(console.error) }
@@ -160,12 +152,53 @@ export function ExpenseView({
   }
 
   const removeExpense = (id: string, source: string) => {
-    if (source !== "manual" && source !== "combined") return; // Prevent deleting auto-fetched items here
+    if (source !== "manual" && source !== "combined") return;
     setExpenses((prev) => prev.filter((e) => e.id !== id))
     if (!id.startsWith("temp")) deleteExpenseAction(id).catch(console.error)
   }
 
   const toggleGroup = (id: string) => setSelectedGroups((prev) => prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id])
+
+  const addGoal = () => {
+    const amount = Number.parseFloat(goalForm.amount)
+    if (!goalForm.name.trim() || Number.isNaN(amount) || !goalForm.targetDate) return
+    setGoals(prev => [...prev, { id: nextId(), name: goalForm.name.trim(), amount, targetDate: goalForm.targetDate }])
+    setGoalForm({ name: "", amount: "", targetDate: "" })
+  }
+
+  const removeGoal = (id: string) => setGoals(prev => prev.filter(g => g.id !== id))
+
+  const aiAnalysis = useMemo(() => {
+    const currentDate = new Date()
+    let totalMonthlyNeeded = 0
+    
+    const analyzedGoals = goals.map(g => {
+      const target = new Date(g.targetDate)
+      let monthsAway = (target.getFullYear() - currentDate.getFullYear()) * 12 + (target.getMonth() - currentDate.getMonth())
+      if (monthsAway <= 0) monthsAway = 1
+      
+      const monthlyNeeded = g.amount / monthsAway
+      totalMonthlyNeeded += monthlyNeeded
+      return { ...g, monthsAway, monthlyNeeded }
+    }).sort((a, b) => a.monthsAway - b.monthsAway)
+
+    const isFeasible = remaining >= totalMonthlyNeeded
+    const shortfall = totalMonthlyNeeded - remaining
+
+    return { analyzedGoals, totalMonthlyNeeded, isFeasible, shortfall }
+  }, [goals, remaining])
+
+  const handleGeneratePlan = async () => {
+    setIsGeneratingPlan(true)
+    try {
+      const tips = await generateFinancialPlan(income, completedItems, goals)
+      setAiTips(tips)
+    } catch (error) {
+      console.error(error)
+    } fileStatus: {
+      setIsGeneratingPlan(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -332,9 +365,142 @@ export function ExpenseView({
           </div>
         </Modal>
       )}
-      
-      {/* (KEEP YOUR EXISTING MODALS HERE FOR ADD EXPENSE & AI) */}
-      
+
+      {/* ADD EXPENSE MODAL */}
+      {showAdd && (
+        <Modal title="Add Expense" subtitle="Record a new expense" onClose={() => setShowAdd(false)}>
+          <div className="mt-5 flex flex-col gap-4">
+            <Field label="Name"><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Dinner out" className="w-full rounded-xl bg-secondary px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2" autoFocus /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Amount"><input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="w-full rounded-xl bg-secondary px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2" /></Field>
+              <Field label="Category">
+                <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl bg-secondary px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2">
+                  {["Food", "Utilities", "Debt", "Lifestyle", "Shared", "Other"].map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Source">
+              <select value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as Source }))} className="w-full rounded-xl bg-secondary px-3 py-2.5 text-sm outline-none ring-primary focus:ring-2">
+                <option value="manual">Manual</option>
+                <option value="groceries">Groceries</option>
+                <option value="debts">Debts</option>
+                <option value="bills">Bills</option>
+              </select>
+            </Field>
+            <button type="button" onClick={addExpense} className="mt-1 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">Add Expense</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* AI FINANCE PLANNER MODAL */}
+      {showAi && (
+        <Modal title="AI Finance Planner" subtitle="Goal-oriented financial analysis" onClose={() => setShowAi(false)}>
+          <div className="mt-5 flex flex-col gap-6">
+            
+            {/* Status Summary Banner */}
+            <div className={cn("flex items-start gap-3 rounded-2xl p-4", aiAnalysis.isFeasible ? "bg-primary/10 border border-primary/20" : "bg-destructive/10 border border-destructive/20")}>
+              <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", aiAnalysis.isFeasible ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground")}>
+                <Sparkles className="size-5" />
+              </span>
+              <div>
+                <p className={cn("text-sm font-semibold", aiAnalysis.isFeasible ? "text-primary" : "text-destructive")}>
+                  {aiAnalysis.isFeasible ? "Your timeline is funded!" : "Budget adjustment required"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-normal">
+                  You have {money(remaining)} remaining monthly. Your upcoming plans require a collective savings rate of {money(aiAnalysis.totalMonthlyNeeded)}/month to hit their targets.
+                  {!aiAnalysis.isFeasible && ` You are falling short by ${money(aiAnalysis.shortfall)} per month.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Interactive Target Form */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-secondary/30 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5 text-primary" /> Add Future Goal
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={goalForm.name} onChange={e => setGoalForm(f => ({...f, name: e.target.value}))} placeholder="Goal Description (e.g. Purchase Car)" className="col-span-2 w-full rounded-xl bg-secondary px-3 py-2 text-sm outline-none ring-primary focus:ring-2" />
+                <input type="number" value={goalForm.amount} onChange={e => setGoalForm(f => ({...f, amount: e.target.value}))} placeholder="Total Budget" className="w-full rounded-xl bg-secondary px-3 py-2 text-sm outline-none ring-primary focus:ring-2" />
+                <input type="date" value={goalForm.targetDate} onChange={e => setGoalForm(f => ({...f, targetDate: e.target.value}))} className="w-full rounded-xl bg-secondary px-3 py-2 text-sm outline-none ring-primary focus:ring-2" />
+              </div>
+              <button onClick={addGoal} className="w-full rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity">
+                Recalculate Savings Timeline
+              </button>
+            </div>
+
+            {/* Savings Targets Group */}
+            <div className="flex flex-col gap-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Required Asset Allocations</h4>
+              {aiAnalysis.analyzedGoals.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Add an upcoming goal to begin generating a matrix timeline.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {aiAnalysis.analyzedGoals.map((g) => (
+                    <li key={g.id} className="flex items-center gap-3 rounded-2xl bg-secondary/50 p-3 relative group border border-border">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-foreground shadow-sm">
+                        <Target className="size-5 text-primary" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{g.name}</p>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                          <span className="flex items-center gap-1"><Calendar className="size-3" /> {g.monthsAway} months</span>
+                          <span>•</span>
+                          <span>{money(g.amount)} total</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-primary">{money(g.monthlyNeeded)}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">/ mo</p>
+                      </div>
+                      <button onClick={() => removeGoal(g.id)} className="absolute -right-2 -top-2 hidden size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm group-hover:flex">
+                        <X className="size-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* AI Goal Breakdown & Strategy */}
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" /> AWS Bedrock Strategy
+                </h4>
+                <button 
+                  onClick={handleGeneratePlan}
+                  disabled={isGeneratingPlan || goals.length === 0}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                >
+                  {isGeneratingPlan ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {aiTips.length > 0 ? "Regenerate Plan" : "Generate Plan"}
+                </button>
+              </div>
+
+              {aiTips.length > 0 ? (
+                <ul className="flex flex-col gap-2">
+                  {aiTips.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-3 rounded-2xl bg-secondary/50 p-3 text-sm leading-relaxed border border-primary/10">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <span className="text-foreground">{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-2xl bg-secondary/30 p-6 text-center border border-dashed border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Click "Generate Plan" to invoke Claude 3 on Amazon Bedrock. The model will analyze your current grocery clusters, active debt ledgers, and statement archives to isolate target areas for spending cutbacks.
+                  </p>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </Modal>
+      )}
+
     </div>
   )
 }
@@ -347,7 +513,6 @@ function ExpenseList({ items, onRemove }: { items: Expense[], onRemove: (id: str
       {items.map((e) => {
         const meta = sourceMeta[e.source]
         const Icon = meta.icon
-        // Only allow manual deletion of "manual" or "combined" expenses. Others auto-sync from their respective pages.
         const canDelete = e.source === "manual" || e.source === "combined"
         
         return (
@@ -370,7 +535,6 @@ function ExpenseList({ items, onRemove }: { items: Expense[], onRemove: (id: str
   )
 }
 
-// ... Keep Modal, Field, and GroupRow components
 function Modal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -385,9 +549,11 @@ function Modal({ title, subtitle, onClose, children }: { title: string; subtitle
     </div>
   )
 }
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{label}</span>{children}</label>
 }
+
 function GroupRow({ name, total, icon: Icon, selected, onToggle }: { name: string; total: number; icon: typeof Wallet; selected: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} aria-pressed={selected} className={cn("flex items-center gap-3 rounded-xl border p-3 text-left transition-colors", selected ? "border-primary bg-accent/40" : "border-border hover:bg-secondary")}>
