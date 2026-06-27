@@ -39,6 +39,7 @@ model User {
   email         String         @unique
   name          String?
   password      String
+  monthlyIncome Float          @default(0.0)
   createdAt     DateTime       @default(now())
   tasks         Task[]
   groceryItems  GroceryItem[]
@@ -182,6 +183,7 @@ model Expense {
   amount        Float
   category      String
   description   String
+  source        String       @default("manual")
   date          DateTime     @default(now())
   groceryList   GroceryList?
   debt          Debt?

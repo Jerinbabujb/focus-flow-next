@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   HandCoins,
   Archive,
+  Wallet,
   Settings,
   Zap,
 } from "lucide-react"
@@ -17,6 +18,7 @@ const navItems = [
   { name: "Groceries", icon: ShoppingCart },
   { name: "Debts", icon: HandCoins },
   { name: "Bill Archive", icon: Archive },
+  { name: "Expenses", icon: Wallet },
 ]
 
 interface SidebarProps {
@@ -67,7 +69,14 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
       <div className="mt-auto flex flex-col gap-3">
         <button
           type="button"
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          onClick={() => onNavigate("Settings")}
+          aria-current={active === "Settings" ? "page" : undefined}
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+            active === "Settings"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+          )}
         >
           <Settings className="size-5 shrink-0" aria-hidden="true" />
           <span>Settings</span>
