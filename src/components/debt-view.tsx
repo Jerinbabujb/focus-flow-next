@@ -31,8 +31,20 @@ interface DraftRow {
 }
 
 const categoryMeta: Record<DebtCategory, { label: string; dot: string; chip: string; icon: typeof ArrowUpRight }> = {
-  "to-give": { label: "To give", dot: "bg-chart-5", chip: "bg-chart-5/15 text-chart-5", icon: ArrowUpRight },
-  given: { label: "Given", dot: "bg-chart-2", chip: "bg-chart-2/15 text-chart-2", icon: ArrowDownLeft },
+  // To Give (Money you owe): Uses your theme's dynamic Destructive/Red color
+  "to-give": { 
+    label: "To give", 
+    dot: "bg-destructive", 
+    chip: "bg-destructive/15 text-destructive font-bold", 
+    icon: ArrowUpRight 
+  },
+  // Given (Money owed to you): Uses a high-visibility Emerald Green that adapts to light/dark mode
+  given: { 
+    label: "Given", 
+    dot: "bg-emerald-500", 
+    chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold", 
+    icon: ArrowDownLeft 
+  },
 }
 
 const today = () => new Date().toISOString().slice(0, 10)

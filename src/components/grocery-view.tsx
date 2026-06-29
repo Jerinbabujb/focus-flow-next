@@ -37,9 +37,24 @@ interface DraftRow {
 }
 
 const priorityMeta: Record<Priority, { label: string; dot: string; chip: string }> = {
-  p1: { label: "P1", dot: "bg-chart-5", chip: "bg-chart-5/15 text-chart-5" },
-  p2: { label: "P2", dot: "bg-chart-4", chip: "bg-chart-4/15 text-chart-4" },
-  p3: { label: "P3", dot: "bg-chart-2", chip: "bg-chart-2/15 text-chart-2" },
+  // P1 (High): Uses your theme's dynamic Red/Destructive color
+  p1: { 
+    label: "P1", 
+    dot: "bg-destructive", 
+    chip: "bg-destructive/15 text-destructive font-bold" 
+  },
+  // P2 (Medium): Uses a high-visibility Amber that adapts to light/dark mode
+  p2: { 
+    label: "P2", 
+    dot: "bg-amber-500", 
+    chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold" 
+  },
+  // P3 (Low): Uses your theme's dynamic Accent/Primary color
+  p3: { 
+    label: "P3", 
+    dot: "bg-primary", 
+    chip: "bg-primary/15 text-primary font-bold" 
+  },
 }
 
 const today = () => new Date().toISOString().slice(0, 10)

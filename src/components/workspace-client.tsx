@@ -17,6 +17,7 @@ import { SettingsView } from "./settings-view"
 
 interface WorkspaceClientProps {
   userName?: string;
+  userEmail?: string;
   initialTasks: Task[];
   initialHistory: TaskHistoryItem[];
   initialGroceries: GroceryItem[]; 
@@ -34,6 +35,7 @@ interface WorkspaceClientProps {
 
 export default function WorkspaceClient({ 
   userName,
+  userEmail,
   initialTasks, 
   initialHistory,
   initialGroceries,
@@ -51,7 +53,7 @@ export default function WorkspaceClient({
   return (
     <main className="app-backdrop min-h-screen">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:flex-row">
-        <Sidebar active={active} onNavigate={setActive} />
+        <Sidebar active={active} onNavigate={setActive} userName={userName} />
         <div className="flex-1 py-2 md:py-0">
           
           {active === "Tasks" ? (
@@ -90,7 +92,7 @@ export default function WorkspaceClient({
 
           ): active === "Settings" ? (
             // 2. Add the Settings route here
-            <SettingsView />
+            <SettingsView initialName={userName} email={userEmail} />
 
           ) : (
             <DashboardView 

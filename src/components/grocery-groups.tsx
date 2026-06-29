@@ -1,12 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import {
-  Users, ArrowLeft, Plus, UserPlus, X, Trash2, ShoppingBasket, Check, Mail, ShoppingCart,
-} from "lucide-react"
+import { Users, ArrowLeft, Plus, UserPlus, X, Trash2, ShoppingBasket, Check, Mail, ShoppingCart } from "lucide-react"
 import { cn } from "@/src/lib/utils"
 
-// 1. IMPORT YOUR SERVER ACTIONS
 import { 
   createGroupAction, 
   deleteGroupAction, 
@@ -42,7 +39,6 @@ export interface ShoppingGroup {
 const formatMoney = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD" })
 
 let idc = 0
-// Added "temp-" so the delete function knows not to hit the DB if the ID is fake
 const nid = (p: string) => `temp-${p}-${Date.now()}-${idc++}` 
 
 const avatarColor = (name: string) => {
@@ -53,7 +49,7 @@ const avatarColor = (name: string) => {
 }
 
 interface GroceryGroupsProps {
-  initialGroups?: ShoppingGroup[] // Accept real DB data
+  initialGroups?: ShoppingGroup[]
   onBack: () => void
 }
 
@@ -79,9 +75,7 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
       members: [{ id: nid("m"), name: "You", email: "you@example.com", status: "owner" }],
       items: [],
     }
-    // 1. Optimistic UI
     setGroups((prev) => [g, ...prev])
-    // 2. Database Sync
     createGroupAction(newGroupName.trim(), "GROCERY").catch(console.error)    
     setNewGroupName("")
     setActiveId(g.id)
@@ -93,18 +87,41 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
     if (!id.startsWith("temp")) deleteGroupAction(id).catch(console.error)
   }
 
-  const inviteMember = () => {
+  const inviteMember = async () => {
     if (!active || inviteEmail.trim() === "") return
+    
+    const emailToInvite = inviteEmail.trim()
+    const nameToInvite = inviteName.trim() || emailToInvite.split("@")[0]
+    const tempId = nid("m")
+
     const member: Member = {
-      id: nid("m"),
-      name: inviteName.trim() || inviteEmail.trim().split("@")[0],
-      email: inviteEmail.trim(),
-      status: "invited",
+      id: tempId,
+      name: nameToInvite,
+      email: emailToInvite,
+      status: "invited", // Optimistically assume they need an invite
     }
+    
     setGroups((prev) => prev.map((g) => (g.id === active.id ? { ...g, members: [...g.members, member] } : g)))
-    inviteMemberAction(active.id, inviteEmail.trim(), inviteName.trim()).catch(console.error)
     setInviteName("")
     setInviteEmail("")
+
+    try {
+      const result = await inviteMemberAction(active.id, emailToInvite, nameToInvite)
+      
+      // If the server says they already existed, update UI to "joined"
+      if (result?.status === "joined") {
+        setGroups((prev) => prev.map((g) => {
+          if (g.id !== active.id) return g
+          return {
+            ...g,
+            members: g.members.map(m => m.id === tempId ? { ...m, status: "joined" } : m)
+          }
+        }))
+      }
+    } catch (error) {
+      console.error("Failed to invite member:", error)
+      // If you want, you can remove the optimistic user here if the action fails entirely
+    }
   }
 
   const removeMember = (memberId: string) => {
@@ -127,10 +144,8 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
       bought: false,
     }
     
-    // 1. Optimistic UI update
     setGroups((prev) => prev.map((g) => (g.id === active.id ? { ...g, items: [item, ...g.items] } : g)))
     
-    // 2. THE FIX: Only hit the database if the group has a real AWS ID!
     if (!active.id.startsWith("temp")) {
       addSharedGroceryItem(active.id, itemName.trim(), qty, amt).catch(console.error)
     }
@@ -155,7 +170,6 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
     if (!itemId.startsWith("temp")) deleteGroceryItem(itemId).catch(console.error)
   }
 
-  // ---------- Group detail view ----------
   if (active) {
     const groupTotal = active.items.reduce((s, i) => s + (i.amount ?? 0), 0)
     return (
@@ -179,7 +193,6 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
           </div>
         </header>
 
-        {/* Members */}
         <section aria-label="Members" className="glass flex flex-col gap-4 rounded-3xl p-5">
           <div className="flex items-center gap-3">
             <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-foreground"><Users className="size-4" aria-hidden="true" /></span>
@@ -213,7 +226,6 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
           </div>
         </section>
 
-        {/* Shared items */}
         <section aria-label="Shared list" className="glass flex flex-col gap-4 rounded-3xl p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -255,7 +267,6 @@ export function GroceryGroups({ initialGroups = [], onBack }: GroceryGroupsProps
     )
   }
 
-  // ---------- Group list view ----------
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">

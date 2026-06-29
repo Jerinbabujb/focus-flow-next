@@ -66,7 +66,7 @@ export default async function Page() {
   const formattedDebtHistory = historyDbDebts.map((d) => ({ id: d.id, person: d.personName, note: d.description || "", category: (d.type === "I_OWE_OTHERS" ? "to-give" : "given") as any, amount: d.amount, date: d.date.toISOString().slice(0, 10), settledAt: d.settledAt ? d.settledAt.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10) }));
 
   // --- 9. FETCH EXPENSES & BILLS ---
-  const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { monthlyIncome: true, name: true }});
+  const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { monthlyIncome: true, name: true , email: true}});
   const dbExpenses = await prisma.expense.findMany({ where: { userId }, orderBy: { date: "desc" }});
   const formattedExpenses = dbExpenses.map(e => ({ id: e.id, name: e.description, amount: e.amount, category: e.category, source: (e.source as any) || "manual", date: e.date.toISOString().slice(0, 10) }));
   
@@ -78,6 +78,7 @@ export default async function Page() {
     <SettingsProvider>
     <WorkspaceClient 
       userName={dbUser?.name || "User"}
+      userEmail={dbUser?.email || "No email found"}
       initialTasks={formattedTasks} initialHistory={formattedHistory} 
       initialGroceries={formattedGroceries} initialGroceryHistory={formattedGroceryHistory}
       initialGroceryGroups={groceryGroups as any} initialDebtGroups={debtGroups as any}       

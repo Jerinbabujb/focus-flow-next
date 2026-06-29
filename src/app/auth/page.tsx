@@ -1,62 +1,67 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { Sparkles, Mail, Lock, User, Eye, EyeOff, Check, X } from "lucide-react"
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react"
+import { Sparkles, Mail, Lock, User, Eye, EyeOff, Check, X, Loader2, AlertCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/src/lib/utils"
-import { authenticate } from "@/src/actions/auth";
-import { useTransition } from "react";
+import { authenticate } from "@/src/actions/auth"
+
 type Mode = "login" | "signup"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<Mode>("login")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition()
+  
   const [form, setForm] = useState({
     username: "",
     email: "",
     password: "",
     confirmPassword: "",
   })
-  const [submitted, setSubmitted] = useState<string | null>(null)
-  const router= useRouter();
+  
+  // Replaced generic "submitted" with a dedicated error state
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const router = useRouter()
 
   const isSignup = mode === "signup"
-  const passwordsMatch =
-    form.password.length > 0 && form.password === form.confirmPassword
+  const passwordsMatch = form.password.length > 0 && form.password === form.confirmPassword
 
   const update = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
-    setSubmitted(null)
+    setErrorMessage(null) // Clear errors when user types
   }
 
   const switchMode = (next: Mode) => {
     setMode(next)
-    setSubmitted(null)
+    setErrorMessage(null)
+    setForm({ username: "", email: "", password: "", confirmPassword: "" }) // Clear form on switch
   }
 
   const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  startTransition(async () => {
-    const formData = new FormData();
-    formData.append("email", form.email);
-    formData.append("password", form.password);
-    if (isSignup) formData.append("username", form.username);
+    e.preventDefault()
+    setErrorMessage(null)
 
-    const result = await authenticate(formData, isSignup);
-    
-    if (result?.error) {
-      setSubmitted(result.error); // Show error in your UI
-    }
-  });
-};
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.append("email", form.email)
+      formData.append("password", form.password)
+      if (isSignup) formData.append("username", form.username)
+
+      const result = await authenticate(formData, isSignup)
+      
+      if (result?.error) {
+        setErrorMessage(result.error) 
+      }
+      // If successful, next/navigation redirect inside authenticate() will handle the transition
+    })
+  }
 
   return (
     <main className="app-backdrop flex min-h-screen items-center justify-center p-4">
-      <div className="glass w-full max-w-md rounded-2xl p-6 sm:p-8">
+      <div className="glass w-full max-w-md rounded-2xl p-6 sm:p-8 shadow-2xl">
         {/* Brand */}
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/30">
@@ -85,7 +90,7 @@ export default function AuthPage() {
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 mode === m
                   ? "bg-primary text-primary-foreground shadow"
-                  : "text-muted-foreground hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50",
               )}
               aria-pressed={mode === m}
             >
@@ -94,132 +99,76 @@ export default function AuthPage() {
           ))}
         </div>
 
+        {/* Error Banner */}
+        {errorMessage && (
+          <div className="mt-6 flex items-start gap-3 rounded-xl bg-destructive/15 p-4 text-destructive animate-in fade-in slide-in-from-top-2 border border-destructive/20">
+            <AlertCircle className="size-5 shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="text-sm font-medium leading-relaxed">{errorMessage}</p>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           {isSignup && (
-            <Field
-              id="username"
-              label="Username"
-              icon={<User className="size-4" aria-hidden="true" />}
-            >
+            <Field id="username" label="Username" icon={<User className="size-4" aria-hidden="true" />}>
               <input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                required
-                value={form.username}
-                onChange={(e) => update("username", e.target.value)}
-                placeholder="janedoe"
-                className={inputClass}
+                id="username" name="username" type="text" autoComplete="username" required
+                value={form.username} onChange={(e) => update("username", e.target.value)}
+                placeholder="janedoe" className={inputClass} disabled={isPending}
               />
             </Field>
           )}
 
-          <Field
-            id="email"
-            label="Email"
-            icon={<Mail className="size-4" aria-hidden="true" />}
-          >
+          <Field id="email" label="Email" icon={<Mail className="size-4" aria-hidden="true" />}>
             <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={form.email}
-              onChange={(e) => update("email", e.target.value)}
-              placeholder="you@example.com"
-              className={inputClass}
+              id="email" name="email" type="email" autoComplete="email" required
+              value={form.email} onChange={(e) => update("email", e.target.value)}
+              placeholder="you@example.com" className={inputClass} disabled={isPending}
             />
           </Field>
 
-          <Field
-            id="password"
-            label="Password"
-            icon={<Lock className="size-4" aria-hidden="true" />}
-          >
+          <Field id="password" label="Password" icon={<Lock className="size-4" aria-hidden="true" />}>
             <input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete={isSignup ? "new-password" : "current-password"}
-              required
-              value={form.password}
-              onChange={(e) => update("password", e.target.value)}
-              placeholder="••••••••"
-              className={cn(inputClass, "pr-10")}
+              id="password" name="password" type={showPassword ? "text" : "password"}
+              autoComplete={isSignup ? "new-password" : "current-password"} required
+              value={form.password} onChange={(e) => update("password", e.target.value)}
+              placeholder="••••••••" className={cn(inputClass, "pr-10")} disabled={isPending}
             />
             <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
+              type="button" onClick={() => setShowPassword((s) => !s)} disabled={isPending}
               className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? (
-                <EyeOff className="size-4" aria-hidden="true" />
-              ) : (
-                <Eye className="size-4" aria-hidden="true" />
-              )}
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </Field>
 
           {isSignup && (
-            <Field
-              id="confirmPassword"
-              label="Confirm password"
-              icon={<Lock className="size-4" aria-hidden="true" />}
-            >
+            <Field id="confirmPassword" label="Confirm password" icon={<Lock className="size-4" aria-hidden="true" />}>
               <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showConfirm ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                value={form.confirmPassword}
-                onChange={(e) => update("confirmPassword", e.target.value)}
-                placeholder="••••••••"
-                className={cn(inputClass, "pr-10")}
+                id="confirmPassword" name="confirmPassword" type={showConfirm ? "text" : "password"}
+                autoComplete="new-password" required
+                value={form.confirmPassword} onChange={(e) => update("confirmPassword", e.target.value)}
+                placeholder="••••••••" className={cn(inputClass, "pr-10")} disabled={isPending}
               />
               <button
-                type="button"
-                onClick={() => setShowConfirm((s) => !s)}
+                type="button" onClick={() => setShowConfirm((s) => !s)} disabled={isPending}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                aria-label={
-                  showConfirm ? "Hide confirm password" : "Show confirm password"
-                }
               >
-                {showConfirm ? (
-                  <EyeOff className="size-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="size-4" aria-hidden="true" />
-                )}
+                {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </Field>
           )}
 
           {isSignup && form.confirmPassword.length > 0 && (
-            <p
-              className={cn(
-                "flex items-center gap-1.5 text-xs",
-                passwordsMatch ? "text-chart-3" : "text-destructive",
-              )}
-            >
-              {passwordsMatch ? (
-                <Check className="size-3.5" aria-hidden="true" />
-              ) : (
-                <X className="size-3.5" aria-hidden="true" />
-              )}
+            <p className={cn("flex items-center gap-1.5 text-xs", passwordsMatch ? "text-emerald-500" : "text-destructive")}>
+              {passwordsMatch ? <Check className="size-3.5" /> : <X className="size-3.5" />}
               {passwordsMatch ? "Passwords match" : "Passwords do not match"}
             </p>
           )}
 
           {!isSignup && (
             <div className="flex justify-end">
-              <button
-                type="button"
-                className="text-xs font-medium text-primary hover:underline"
-              >
+              <button type="button" className="text-xs font-medium text-primary hover:underline">
                 Forgot password?
               </button>
             </div>
@@ -227,20 +176,17 @@ export default function AuthPage() {
 
           <button
             type="submit"
-            disabled={isSignup && !passwordsMatch}
-            className="mt-1 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isPending || (isSignup && !passwordsMatch)}
+            className="mt-1 flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSignup ? "Create account" : "Log in"}
+            {isPending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : isSignup ? (
+              "Create account"
+            ) : (
+              "Log in"
+            )}
           </button>
-
-          {submitted && (
-            <p
-              className="rounded-lg bg-chart-3/15 px-3 py-2 text-center text-sm text-chart-3"
-              role="status"
-            >
-              {submitted}
-            </p>
-          )}
         </form>
 
         {/* Footer switch */}
@@ -250,6 +196,7 @@ export default function AuthPage() {
             type="button"
             onClick={() => switchMode(isSignup ? "login" : "signup")}
             className="font-medium text-primary hover:underline"
+            disabled={isPending}
           >
             {isSignup ? "Log in" : "Sign up"}
           </button>
@@ -260,19 +207,9 @@ export default function AuthPage() {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-input bg-secondary/50 py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
+  "w-full rounded-xl border border-input bg-secondary/50 py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
 
-function Field({
-  id,
-  label,
-  icon,
-  children,
-}: {
-  id: string
-  label: string
-  icon: React.ReactNode
-  children: React.ReactNode
-}) {
+function Field({ id, label, icon, children }: { id: string; label: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm font-medium text-foreground">
